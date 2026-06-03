@@ -105,11 +105,13 @@ MonoBehaviour:
   previewTexture: {fileID: 2800000, guid: 92c40222b0d6e744795d46c7f3c42ca5, type: 3}
   horizontalFOV: 60
   verticalFOV: 45
+  nearClipDistance: 0.1
   projectDistance: 20
   sphereBlendAlpha: 0
   depthBias: 0.02
   gamma: 2.2
   brightness: 1
+  falloff: 0.1
   depthSize: 512
   projectShader: {fileID: -6465566751694194690, guid: 44dc005800bbf214d8b5a3638d9395be,
     type: 3}
@@ -177,7 +179,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.01
+  near clip plane: 0.1
   far clip plane: 20
   field of view: 45
   orthographic: 0

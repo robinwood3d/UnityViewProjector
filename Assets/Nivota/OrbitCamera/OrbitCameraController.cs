@@ -1,11 +1,9 @@
-/*******************************************************************************
-* ×÷ÕßÃû³Æ£ºrobin
-* ÃèÊö£ºÏà»úÔË¶¯¿ØÖÆÆ÷
-******************************************************************************/
 using System;
+using System.Collections;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 
 public enum OrbitCameraState
@@ -89,7 +87,7 @@ public struct OrbitCameraSettings
 
             return settings;
         }
-
+        
     }
 }
 
@@ -101,7 +99,7 @@ public class OrbitCameraController : MonoBehaviour
 
     OrbitCameraState orbitCameraState = OrbitCameraState.Orbiting;
 
-    //ÓÃ»§ÊäÈë
+    //ç”¨æˆ·è¾“å…¥
 
     Vector2 deltaOrbitInput;
 
@@ -109,7 +107,7 @@ public class OrbitCameraController : MonoBehaviour
 
     float deltaZoomInput;
 
-    //Ïà»úÉèÖÃ
+    //ç›¸æœºè®¾ç½®
 
     public float cameraOrbitRate = 1f;
 
@@ -124,7 +122,7 @@ public class OrbitCameraController : MonoBehaviour
 
     public OrbitCameraSettings orbitCameraSettings = OrbitCameraSettings.defaultSettings;
 
-    //Ïà»úÔË¶¯Êı¾İ
+    //ç›¸æœºè¿åŠ¨æ•°æ®
     public Vector3 targetOrbitLocation;
 
     public Vector3 targetOrbitRotation;
@@ -145,7 +143,7 @@ public class OrbitCameraController : MonoBehaviour
 
     Vector2 smoothedViewOffset;
 
-    //»úÎ»ÇĞ»»Êı¾İ
+    //æœºä½åˆ‡æ¢æ•°æ®
     Vector3 transitionStartLocation;
 
     Vector3 transitionStartRotation;
@@ -156,7 +154,7 @@ public class OrbitCameraController : MonoBehaviour
 
     Vector2 transitionStartViewOffset;
 
-    //Ê¹ÓÃÖ¸Õë¶¨ÏòÔË¶¯
+    //ä½¿ç”¨æŒ‡é’ˆå®šå‘è¿åŠ¨
     public bool usePointerOrbit = false;
 
     Vector3 pointerPinLocation;
@@ -171,14 +169,123 @@ public class OrbitCameraController : MonoBehaviour
     public TransitionEvent onTransitionStart = new TransitionEvent();
     public TransitionEvent onTransitionFinished = new TransitionEvent();
 
+
+    private CanvasGroup fadeCanvasGroup;
+    private Image fadeImage;
+    private const string OVERLAY_NAME = "Global_Screen_Fade_Overlay";
+
+    /// <summary>
+    /// å…¨å±æ¸å˜æ ¸å¿ƒå‡½æ•°
+    /// </summary>
+    /// <param name="fromAlpha">èµ·å§‹é€æ˜åº¦ (0-1)</param>
+    /// <param name="toAlpha">ç›®æ ‡é€æ˜åº¦ (0-1)</param>
+    /// <param name="duration">è¿‡æ¸¡è€—æ—¶</param>
+    /// <param name="color">è¦†ç›–é¢œè‰²</param>
+    /// <param name="holdWhenFinished">å®Œæˆåæ˜¯å¦ä¿æŒå½“å‰çŠ¶æ€</param>
+    public void StartCameraFade(float fromAlpha, float toAlpha, float duration, Color color, bool holdWhenFinished)
+    {
+        // 1. åªæœ‰ä¸»ç›¸æœºæ‰å…è®¸æ‰§è¡Œï¼Œé¿å…å¤šç›¸æœºå†²çª
+        if (!gameObject.CompareTag("MainCamera")) return;
+
+        // 2. ç¡®ä¿ UI å…ƒç´ å°±ç»ª
+        EnsureFadeElementsReady();
+
+        // 3. è®¾ç½®é¢œè‰²
+        fadeImage.color = color;
+
+        // 4. å¼€å¯æ¸å˜åç¨‹ï¼ˆå…ˆåœæ­¢æœ¬è„šæœ¬å†…ä¹‹å‰çš„åç¨‹é˜²æ­¢å†²çªï¼‰
+        //StopAllCoroutines();
+        StartCoroutine(FadeRoutine(fromAlpha, toAlpha, duration, holdWhenFinished));
+    }
+
+    private IEnumerator FadeRoutine(float from, float to, float duration, bool hold)
+    {
+        float elapsed = 0f;
+        fadeCanvasGroup.alpha = from;
+
+        // åªè¦ä¸æ˜¯å…¨é€æ˜ï¼Œå°±å¼€å¯ç‚¹å‡»æ‹¦æˆªï¼Œé˜²æ­¢è¿‡æ¸¡æœŸé—´ç©å®¶ç‚¹å‡»èƒŒæ™¯
+        fadeCanvasGroup.blocksRaycasts = (from > 0.01f || to > 0.01f);
+
+        if (duration > 0)
+        {
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                fadeCanvasGroup.alpha = Mathf.Lerp(from, to, elapsed / duration);
+                yield return null;
+            }
+        }
+
+        fadeCanvasGroup.alpha = to;
+
+        // å¤„ç†å®Œæˆåçš„ä¿æŒé€»è¾‘
+        if (!hold)
+        {
+            fadeCanvasGroup.alpha = 0f;
+            fadeCanvasGroup.blocksRaycasts = false;
+        }
+        else
+        {
+            // å¦‚æœä¿æŒä¸”ç›®æ ‡æ˜¯é€æ˜ï¼Œä¹Ÿéœ€è¦é‡Šæ”¾ç‚¹å‡»æ‹¦æˆª
+            fadeCanvasGroup.blocksRaycasts = (to > 0.01f);
+        }
+    }
+
+    private void EnsureFadeElementsReady()
+    {
+        if (fadeCanvasGroup != null) return;
+
+        // å¯»æ‰¾æˆ–åˆ›å»º Canvas
+        Canvas targetCanvas = FindObjectOfType<Canvas>();
+        if (targetCanvas == null)
+        {
+            GameObject canvasObj = new GameObject("DynamicFadeCanvas");
+            targetCanvas = canvasObj.AddComponent<Canvas>();
+            targetCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            targetCanvas.sortingOrder = 999;
+            canvasObj.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasObj.AddComponent<GraphicRaycaster>();
+        }
+
+        // å¯»æ‰¾æˆ–åˆ›å»º Overlay
+        Transform overlayT = targetCanvas.transform.Find(OVERLAY_NAME);
+        GameObject obj;
+
+        if (overlayT == null)
+        {
+            obj = new GameObject(OVERLAY_NAME);
+            obj.transform.SetParent(targetCanvas.transform, false);
+            obj.transform.SetAsLastSibling();
+
+            fadeImage = obj.AddComponent<Image>();
+            RectTransform rect = obj.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.sizeDelta = Vector2.zero;
+
+            fadeCanvasGroup = obj.AddComponent<CanvasGroup>();
+        }
+        else
+        {
+            obj = overlayT.gameObject;
+            fadeImage = obj.GetComponent<Image>();
+            fadeCanvasGroup = obj.GetComponent<CanvasGroup>() ?? obj.AddComponent<CanvasGroup>();
+        }
+    }
+
+
+
     protected virtual void OnValidate()
     {
         orbitCamera = gameObject.GetComponent<Camera>();
         orbitCamera.usePhysicalProperties = true;
+
+        TransitionType targetTransitionType = orbitCameraSettings.transitionType;
+
         orbitCameraSettings.transitionType = TransitionType.Teleport;
         StartCameraTransition(orbitCameraSettings);
         UpdateSmoothMovement(0f);
-        orbitCameraSettings.transitionType = TransitionType.Smooth;
+        orbitCameraSettings.transitionType = targetTransitionType;
     }
 
     // Start is called before the first frame update
@@ -193,7 +300,7 @@ public class OrbitCameraController : MonoBehaviour
         transitionTimeline.AddTrack("Transition", timelineCurve);
         transitionTimeline.AddUpdateEvent(timelineUpdate);
         transitionTimeline.AddFinishEvent(timelineEnd);
-
+        
     }
 
     // Update is called once per frame
@@ -201,7 +308,7 @@ public class OrbitCameraController : MonoBehaviour
     {
         PlayerInputTest();
 
-        switch (orbitCameraState)
+        switch(orbitCameraState)
         {
             case OrbitCameraState.Orbiting:
                 {
@@ -238,19 +345,37 @@ public class OrbitCameraController : MonoBehaviour
 
     public void AddZoomInput(float zoomInput)
     {
-        float factor = zoomInput > 0 ? 0.6f : 1f;
-        factor *= (GetZoomDistance() + 0.02f);
-        factor *= (usePointerOrbit ? -4f : -0.8f);
-        factor = orbitCameraSettings.useFocalZoom ? 10f : factor;
+        float factor = 1;
+        if (orbitCameraSettings.useFocalZoom)
+        {
+            factor = zoomInput > 0 ? 15f : 10f;
+        }
+        else
+        {
+            factor = zoomInput > 0 ? 0.6f : 1f;
+            factor *= (GetZoomDistance() + 2f);
+            factor *= (usePointerOrbit ? -4f : -0.8f);
+        }
+
         deltaZoomInput = zoomInput * cameraZoomRate * (1f / (GetViewportScale() * GetTanHalfFOV())) * factor;
     }
 
     public void AddPanInput(Vector2 panInput)
     {
-        deltaPanInput = panInput * (GetZoomDistance() + 0.02f) * GetTanHalfFOV() * cameraPanRate * (1f / GetViewportScale()) * -0.08f;
+        deltaPanInput = (1f / GetViewportScale()) * (GetZoomDistance() + 2f) * -0.08f * cameraPanRate * GetTanHalfFOV() * panInput;
     }
 
     public void StartCameraTransition(OrbitCameraSettings transitionSettings)
+    {
+        if (!gameObject.activeInHierarchy)
+        {
+            return;
+        }
+        StopAllCoroutines();
+        StartCoroutine(StartCameraTransitionRoutine(transitionSettings));
+    }
+
+    public IEnumerator StartCameraTransitionRoutine(OrbitCameraSettings transitionSettings)
     {
         orbitCameraSettings = transitionSettings;
         orbitCameraState = OrbitCameraState.Transitioning;
@@ -265,19 +390,40 @@ public class OrbitCameraController : MonoBehaviour
         {
             case TransitionType.Smooth:
                 {
-                    transitionTimeline.PlayFromStart();
+                    transitionTimeline?.PlayFromStart();
                 }
                 break;
 
             case TransitionType.Fade:
                 {
+                    smoothedOrbitLocation = targetOrbitLocation = orbitCameraSettings.orbitLocation;
+                    smoothedOrbitRotation = targetOrbitRotation = orbitCameraSettings.orbitRotation;
+                    smoothedZoomDistance = targetZoomDistance = orbitCameraSettings.zoomDistance;
+                    smoothedFocalLength = targetFocalLength = orbitCameraSettings.focalLength;
+                    smoothedViewOffset = targetViewOffset = new Vector2(
+                        orbitCameraSettings.horizontalViewOffset, orbitCameraSettings.verticalViewOffset);
+                    StartCameraFade(1f, 0f, 0.5f, Color.black, true);
 
+                    orbitCameraState = OrbitCameraState.Orbiting;
+                    onTransitionFinished?.Invoke();
+                    
                 }
                 break;
 
             case TransitionType.FadeInFadeOut:
                 {
+                    StartCameraFade(0f, 1f, 0.5f, Color.black, true);
+                    yield return new WaitForSeconds(0.5f);
+                    smoothedOrbitLocation = targetOrbitLocation = orbitCameraSettings.orbitLocation;
+                    smoothedOrbitRotation = targetOrbitRotation = orbitCameraSettings.orbitRotation;
+                    smoothedZoomDistance = targetZoomDistance = orbitCameraSettings.zoomDistance;
+                    smoothedFocalLength = targetFocalLength = orbitCameraSettings.focalLength;
+                    smoothedViewOffset = targetViewOffset = new Vector2(
+                        orbitCameraSettings.horizontalViewOffset, orbitCameraSettings.verticalViewOffset);
+                    StartCameraFade(1f, 0f, 0.5f, Color.black, true);
 
+                    orbitCameraState = OrbitCameraState.Orbiting;
+                    onTransitionFinished?.Invoke();
                 }
                 break;
 
@@ -293,7 +439,7 @@ public class OrbitCameraController : MonoBehaviour
                     onTransitionFinished?.Invoke();
                 }
                 break;
-
+                
             case TransitionType.Interp:
                 {
                     targetOrbitLocation = orbitCameraSettings.orbitLocation;
@@ -308,24 +454,24 @@ public class OrbitCameraController : MonoBehaviour
                 }
                 break;
         }
-
+            
     }
 
     protected void PointerPin(float pointerX, float pointerY)
     {
-        if (usePointerOrbit)
+        if(usePointerOrbit)
         {
             Ray pointerRay = Camera.main.ScreenPointToRay(new Vector3(pointerX, pointerY));
-            if (Physics.Raycast(pointerRay, out RaycastHit hit))
+            if(Physics.Raycast(pointerRay,out RaycastHit hit))
             {
                 pointerPinLocation = hit.point;
             }
             else
             {
                 Plane plane = new Plane(orbitCameraSettings.panScreenSpace ? transform.forward : Vector3.up, pointerPinLocation);
-                if (plane.Raycast(pointerRay, out float t))
+                if(plane.Raycast(pointerRay, out float t))
                 {
-                    pointerPinLocation = pointerRay.GetPoint(t);
+                    pointerPinLocation = pointerRay.GetPoint(t);                   
                 }
                 else
                 {
@@ -336,7 +482,7 @@ public class OrbitCameraController : MonoBehaviour
             smoothedOrbitLocation = targetOrbitLocation;
             Vector3 localVec = transform.InverseTransformDirection(pointerRay.direction);
             Vector3 localRot = Quaternion.LookRotation(localVec).eulerAngles;
-
+            
             targetViewOffset.x = NormalizeAxis(localRot.y);
             targetViewOffset.y = NormalizeAxis(localRot.x);
             smoothedViewOffset = targetViewOffset;
@@ -369,7 +515,7 @@ public class OrbitCameraController : MonoBehaviour
 
             Vector3 localVec = transform.InverseTransformDirection(pointerRay.direction);
             Vector3 localRot = Quaternion.LookRotation(localVec).eulerAngles;
-
+            
             targetViewOffset.x = NormalizeAxis(localRot.y);
             targetViewOffset.y = NormalizeAxis(localRot.x);
 
@@ -395,7 +541,7 @@ public class OrbitCameraController : MonoBehaviour
     {
         Vector3 deltaRotator = new Vector3(0, deltaYaw, 0);
         Quaternion pendingQuat = Quaternion.Euler(new Vector3(0, targetOrbitRotation.y, 0)) * Quaternion.Euler(deltaRotator);
-        Vector3 pendingDir = pendingQuat * Vector3.forward;
+        Vector3 pendingDir = pendingQuat* Vector3.forward;
         Vector3 baseDir = new Vector3(orbitCameraSettings.constraintBaseAxis.x, 0, orbitCameraSettings.constraintBaseAxis.z).normalized;
         float pendingYaw = Vector3.SignedAngle(baseDir, pendingDir, Vector3.up);
         return (pendingYaw >= orbitCameraSettings.minYawOffset && pendingYaw <= orbitCameraSettings.maxYawOffset);
@@ -404,8 +550,8 @@ public class OrbitCameraController : MonoBehaviour
     bool IsPendingPitchInRange(float DeltaPitch)
     {
         Vector3 deltaRotator = new Vector3(DeltaPitch, 0, 0);
-        Quaternion pendingQuat = Quaternion.Euler(new Vector3(targetOrbitRotation.x, 0, 0)) * Quaternion.Euler(deltaRotator);
-        Vector3 pendingDir = pendingQuat * Vector3.forward;
+        Quaternion pendingQuat = Quaternion.Euler(new Vector3(targetOrbitRotation.x, 0, 0))*Quaternion.Euler(deltaRotator);
+        Vector3 pendingDir = pendingQuat* Vector3.forward;
         Quaternion baseQuat = Quaternion.LookRotation(orbitCameraSettings.constraintBaseAxis);
         Vector3 baseRotator = new Vector3(baseQuat.eulerAngles.x, 0, 0);
         Vector3 baseDir = Quaternion.Euler(baseRotator) * Vector3.forward;
@@ -430,7 +576,7 @@ public class OrbitCameraController : MonoBehaviour
 
     void HandleZoomInput()
     {
-
+        
         if (orbitCameraSettings.useFocalZoom)
         {
             targetFocalLength = Mathf.Clamp(targetFocalLength + deltaZoomInput, orbitCameraSettings.minFocalLength, orbitCameraSettings.maxFocalLength);
@@ -439,7 +585,7 @@ public class OrbitCameraController : MonoBehaviour
         {
             float clampedZoomDist = Mathf.Clamp(targetZoomDistance + deltaZoomInput, orbitCameraSettings.minZoomDistance, orbitCameraSettings.maxZoomDistance);
             targetZoomDistance = usePointerOrbit ? (targetZoomDistance + deltaZoomInput) : clampedZoomDist;
-
+            
         }
         deltaZoomInput = 0;
     }
@@ -475,7 +621,7 @@ public class OrbitCameraController : MonoBehaviour
             alpha = smoothInterpSpeed * deltaTime;
         }
 
-        smoothedOrbitLocation = Vector3.Lerp(smoothedOrbitLocation, targetOrbitLocation, alpha);
+        smoothedOrbitLocation = Vector3.Lerp(smoothedOrbitLocation, targetOrbitLocation, alpha );
 
         smoothedOrbitRotation = LerpRotatorWithoutRoll(
             smoothedOrbitRotation,
@@ -491,7 +637,7 @@ public class OrbitCameraController : MonoBehaviour
 
         smoothedZoomDistance = Mathf.Lerp(smoothedZoomDistance, targetZoomDistance, alpha);
 
-        Vector3 localViewVector = Quaternion.Euler(smoothedViewOffset.y, smoothedViewOffset.x, 0) * Vector3.forward;
+        Vector3 localViewVector = Quaternion.Euler(smoothedViewOffset.y, smoothedViewOffset.x, 0)*Vector3.forward;
         Vector3 worldViewVector = Quaternion.Euler(smoothedOrbitRotation) * localViewVector;
         float distance = smoothedZoomDistance / Vector3.Dot(worldViewVector, Quaternion.Euler(smoothedOrbitRotation) * Vector3.forward);
         Vector3 offset = worldViewVector * distance;
@@ -503,7 +649,7 @@ public class OrbitCameraController : MonoBehaviour
 
     void UpdateFocusDistance()
     {
-
+        
     }
 
     public OrbitCameraState GetCameraState()
@@ -522,7 +668,7 @@ public class OrbitCameraController : MonoBehaviour
             B.x = 0f;
             B.z = 0f;
             result.y = Quaternion.Slerp(Quaternion.Euler(A), Quaternion.Euler(B), Alpha).eulerAngles.y;
-            return result;
+            return result; 
         }
         result.y = Mathf.LerpAngle(A.y, B.y, Alpha);
         return result;
@@ -530,7 +676,7 @@ public class OrbitCameraController : MonoBehaviour
 
     float NormalizeAxis(float angle)
     {
-        if (angle > 180f)
+        if(angle > 180f)
         {
             angle -= 360f;
         }
@@ -540,7 +686,7 @@ public class OrbitCameraController : MonoBehaviour
     float ClampAxis(float angle)
     {
         angle = angle % 360f;
-        if (angle < 0f)
+        if(angle < 0f)
         {
             angle += 360f;
         }
@@ -548,7 +694,7 @@ public class OrbitCameraController : MonoBehaviour
     }
     void SetEnableAutoFocus(bool enabled)
     {
-
+        
     }
 
     void StopTransitionTimeline()
@@ -575,56 +721,13 @@ public class OrbitCameraController : MonoBehaviour
         else
         {
             Gizmos.DrawLine(transform.position, orbitCameraSettings.orbitLocation);
+
+            orbitCameraSettings.orbitRotation = Quaternion.LookRotation(orbitCameraSettings.orbitLocation - transform.position).eulerAngles;
+            transform.eulerAngles = orbitCameraSettings.orbitRotation;
+
+            orbitCameraSettings.zoomDistance = Vector3.Magnitude(orbitCameraSettings.orbitLocation - transform.position);
+
         }
     }
 
-    /// <summary>
-    /// Í¬²½Î»ÖÃ
-    /// </summary>
-    public void SyncStateFromTransform()
-    {
-        // 1. »ñÈ¡µ±Ç°µÄÎïÀíĞı×ª
-        Vector3 currentEuler = transform.eulerAngles;
-
-        // 2. Í¬²½Ğı×ªÊı¾İ
-        smoothedOrbitRotation = currentEuler;
-        targetOrbitRotation = currentEuler;
-
-        // 3. Í¬²½Î»ÖÃÊı¾İ
-        Vector3 lookDir = transform.forward;
-
-        // ÕâÀïÎÒÃÇ¼òµ¥µØÊ¹ÓÃµ±Ç°µÄ targetZoomDistance À´·´ÍÆÖĞĞÄµã
-        smoothedOrbitLocation = transform.position + (lookDir * smoothedZoomDistance);
-        targetOrbitLocation = smoothedOrbitLocation;
-
-        // 4. ÖØÖÃÊÓÍ¼Æ«ÒÆ£¬·ÀÖ¹ÇĞ»ØÀ´Ê±»­ÃæÌø¶¯
-        smoothedViewOffset = Vector2.zero;
-        targetViewOffset = Vector2.zero;
-
-        // 5. È·±£½¹¾àµÈÆäËû²ÎÊıÒ²Í¬²½£¨Èç¹ûÓĞ±ØÒª£©
-        smoothedFocalLength = orbitCamera.focalLength;
-    }
-
-    /// <summary>
-    ///Ïà»úÒÆ¶¯µ½Ö¸¶¨Î»ÖÃ£¬²¢ÖØÖÃÃªµã£¬
-    /// </summary>
-    /// <param name="position">ĞÂµÄÄ¿±êÎ»ÖÃ</param>
-    /// <param name="isTeleport">true=Ë²¼ä´«ËÍ£¬false=Æ½»¬ÒÆ¶¯</param>
-    public void MoveToPosition(Vector3 position, bool isTeleport = false)
-    {
-        // 1. ºËĞÄ£ºĞŞ¸Ä Settings ÖĞµÄÃªµãÎ»ÖÃ
-        orbitCameraSettings.orbitLocation = position;
-
-        // 2. ÉèÖÃ¿ØÖÆÆ÷µÄÄ¿±êÎ»ÖÃ
-        targetOrbitLocation = position;
-
-        // 3. Èç¹ûĞèÒªË²¼äµ½´ï£¨´«ËÍ£©£¬ÔòÍ¬²½Æ½»¬²åÖµ±äÁ¿
-        if (isTeleport)
-        {
-            smoothedOrbitLocation = position;
-
-            // ¿ÉÑ¡£ºÈç¹ûÄãÏ£Íû´«ËÍºó£¬Ğı×ª½Ç¶È±£³Ö²»±ä»òÖØÖÃ£¬¿ÉÒÔÔÚÕâÀï´¦Àí
-            // smoothedOrbitRotation = targetOrbitRotation; 
-        }
-    }
 }

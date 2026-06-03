@@ -1,10 +1,4 @@
-/*******************************************************************************
-* 作者名称：robin
-* 描述：用于简单线性timeline动画
-******************************************************************************/
-using System;
-using System.Collections;
-using System.Collections.Generic;
+锘縰sing System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -182,7 +176,7 @@ public class Timeline : MonoBehaviour
         playRate = newRate;
     }
 
-    //添加曲线轨道
+    //娣诲姞鏇茬嚎杞ㄩ亾
     public void AddTrack(string newTrackName, AnimationCurve newCurve)
     {
         if (!curveTracks.ContainsKey(newTrackName))
@@ -191,7 +185,7 @@ public class Timeline : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning($"字典中已含有名为{newTrackName}的key，已替换对应value");
+            Debug.LogWarning($"瀛楀吀涓凡鍚湁鍚嶄负{newTrackName}鐨刱ey锛屽凡鏇挎崲瀵瑰簲value");
             curveTracks[newTrackName] = newCurve;
         }
     }
@@ -230,7 +224,7 @@ public class Timeline : MonoBehaviour
         return position;
     }
 
-    //给定一个时间点，判断当前时间轴是否播放到了该时间点
+    //缁欏畾涓�涓椂闂寸偣锛屽垽鏂綋鍓嶆椂闂磋酱鏄惁鎾斁鍒颁簡璇ユ椂闂寸偣
     public bool AtPosition(float pos)
     {
         if (lastPosition < position)
