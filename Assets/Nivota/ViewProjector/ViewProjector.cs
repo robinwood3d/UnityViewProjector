@@ -65,7 +65,7 @@ public class ViewProjector : MonoBehaviour
         UpdateProjection();
     }
 
-    public void SetProjectedTexture(Texture texture)
+    public void SetProjectionTexture(Texture texture)
     {
         decalMaterial.SetTexture("_Image", texture);
     }
